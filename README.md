@@ -11,7 +11,9 @@ Then, generate JSON schemas (.json) from these POJOs with this application. In t
 
 ```bash
 mvn clean install
-java -jar target/p2js.jar --source /home/jari/dev/lowcode-backend-python/http-server/test/src/gen/java/org/openapitools/model/
+java -jar target/p2js.jar \
+  --source /home/jari/dev/lowcode-backend-python/http-server/test/src/gen/java/org/openapitools/model/ \
+  --target ./models/org/openapitools/model
 ```
 You can find generated schemas (.json) in `models/org/openapitools/*.json
 `

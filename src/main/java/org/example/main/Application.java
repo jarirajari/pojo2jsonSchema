@@ -15,22 +15,26 @@ import java.util.stream.Stream;
 import static java.nio.file.StandardOpenOption.*;
 
 public class Application {
-    private static final String USAGE = "\"Usage: java -jar p2js.jar --source <dir>\"";
+    private static final String USAGE = "\"Usage: java -jar p2js.jar --source <dir> --target <dir>\"";
     private static Generator generator = new Generator();
     public static void main(String[] args) {
-        if (args.length != 2) {
+        if (args.length != 4) {
             System.out.println(USAGE);
             System.exit(1);
         }
         String inputDir = args[1];
         Path inputDirPath = Paths.get(inputDir);
+        String outputDir = args[3];
+        Path outputDirPath = Paths.get(outputDir);
         Boolean inputDirChecked = Files.isDirectory(inputDirPath) && Files.isReadable(inputDirPath);
-        Boolean sourceArg = args[0].equals("--source");
-        if (inputDirChecked && sourceArg) {
+        Boolean outputDirChecked = Files.isDirectory(outputDirPath) && Files.isWritable(outputDirPath);
+        Boolean sourceArg = args[0].equals("--source"); // args[1] is dir
+        Boolean targetArg = args[2].equals("--target"); // args[3] is dir
+        if (inputDirChecked && sourceArg && outputDirChecked && targetArg) {
             List<Path> modelFilePaths = copyModelFilesToClassPath(inputDirPath);
             Map<String, String> models = generator.generate(modelFilePaths);
-            Boolean generated = writeGeneratedModels(models);
-            System.out.println(generated ? "Generated models!" : "Generation error!");
+            Boolean generated = writeGeneratedModels(outputDirPath, models);
+            System.out.println(String.format("\nGenerated %d models! %s", models.keySet().size(), (generated) ? "" : "error!"));
             System.exit(0);
         } else {
             System.out.println(USAGE);
@@ -84,15 +88,14 @@ public class Application {
         return result;
     }
 
-    public static Boolean writeGeneratedModels(Map<String, String> models) {
-        final Path modelDir = Paths.get("models/org/openapitools/model");
+    public static Boolean writeGeneratedModels(Path outputDir, Map<String, String> models) {
         final AtomicBoolean success = new AtomicBoolean(true);
         models.entrySet().stream().forEach(entry -> {
             String key = entry.getKey();
             String val = entry.getValue();
             try {
                 String name = key+".json";
-                String outputFilename = modelDir.toString().concat(name);
+                String outputFilename = outputDir.toString().concat(name);
                 Path file = Paths.get(outputFilename);
                 List<String> lines = Arrays.asList(val.split("\n"));
                 Files.write(file, lines, CREATE, WRITE, TRUNCATE_EXISTING);
