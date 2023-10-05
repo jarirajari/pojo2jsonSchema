@@ -4,6 +4,10 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import com.github.javaparser.StaticJavaParser;
+import com.github.javaparser.ast.CompilationUnit;
+import com.github.javaparser.ast.PackageDeclaration;
+import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
 import com.kjetland.jackson.jsonSchema.JsonSchemaGenerator;
 import org.apache.commons.collections.ListUtils;
 import org.apache.commons.collections.MapUtils;
@@ -12,11 +16,15 @@ import org.apache.commons.io.FilenameUtils;
 
 import javax.tools.*;
 import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -35,19 +43,31 @@ public class Generator {
                 .enable(SerializationFeature.INDENT_OUTPUT);
         JsonSchemaGenerator jsonSchemaGenerator = new JsonSchemaGenerator(objectMapper);
         Map<String, String> generated = new HashMap<>();
-        modelPaths.stream().forEach(model -> {
+
+        modelPaths.stream().forEach(modelPath -> {
             try {
-                String name = model.getFileName().toString();
+                String name = modelPath.getFileName().toString();
                 String filename = FilenameUtils.getBaseName(name);
                 String extension = FilenameUtils.getExtension(name);
-                Boolean compiled = compileJavaFile(Paths.get(String.format("models/org/openapitools/model/%s.%s", filename, extension)));
-                URLClassLoader classLoader = URLClassLoader.newInstance(new URL[]{new File("models").toURI().toURL()}, ClassLoader.getSystemClassLoader());
-                Class clazz = classLoader.loadClass(String.format("org.openapitools.model.%s", filename));
+                String directory = modelPath.getParent().toAbsolutePath().toString();
+                // Pojos (.java files) need to be compiled into classes (in a temp directory)
+                CompilationUnit cu = StaticJavaParser.parse(modelPath.toFile());
+                ClassOrInterfaceDeclaration classDeclaration = cu.findFirst(ClassOrInterfaceDeclaration.class).orElse(null);
+                String className = classDeclaration != null ? classDeclaration.getNameAsString() : "";
+                cu.removePackageDeclaration();
+                String updatedCode = cu.toString();
+                Files.write(modelPath, updatedCode.getBytes(), StandardOpenOption.TRUNCATE_EXISTING);
+                Boolean compiled = compileJavaFile(modelPath);
+                URLClassLoader classLoader = URLClassLoader.newInstance(new URL[]{new File(directory).toURI().toURL()}, ClassLoader.getSystemClassLoader());
+                Class clazz = classLoader.loadClass(className);
+                // Generate the JSON Schema => .json files are written to target path
                 JsonNode jsonSchema = jsonSchemaGenerator.generateJsonSchema(clazz);
                 String jsonSchemaAsString = objectMapper.writeValueAsString(jsonSchema);
                 generated.put(filename, jsonSchemaAsString);
-                System.out.println(String.format("Generated model '%s' with '%s'", filename, jsonSchemaAsString));
-            } catch (JsonProcessingException | ClassNotFoundException | MalformedURLException e) {
+                System.out.println(String.format("Generated modelPath '%s' with '%s'", filename, jsonSchemaAsString));
+            } catch (JsonProcessingException | ClassNotFoundException | MalformedURLException | FileNotFoundException e) {
+                e.printStackTrace();
+            } catch (IOException e) {
                 e.printStackTrace();
             }
         });

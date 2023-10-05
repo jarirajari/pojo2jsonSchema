@@ -5,6 +5,7 @@ import org.apache.commons.io.FileUtils;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.*;
+import java.nio.file.attribute.FileAttribute;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -31,7 +32,8 @@ public class Application {
         Boolean sourceArg = args[0].equals("--source"); // args[1] is dir
         Boolean targetArg = args[2].equals("--target"); // args[3] is dir
         if (inputDirChecked && sourceArg && outputDirChecked && targetArg) {
-            List<Path> modelFilePaths = copyModelFilesToClassPath(inputDirPath);
+            // The files are copied to a temp directory! Target directory is where ONLY json schemas are written!
+            List<Path> modelFilePaths = copyModelFilesToClassPathTemporarily(inputDirPath);
             Map<String, String> models = generator.generate(modelFilePaths);
             Boolean generated = writeGeneratedModels(outputDirPath, models);
             System.out.println(String.format("\nGenerated %d models! %s", models.keySet().size(), (generated) ? "" : "error!"));
@@ -42,20 +44,20 @@ public class Application {
         }
     }
 
-    private static List<Path> copyModelFilesToClassPath(Path inputDirPath) {
+    private static List<Path> copyModelFilesToClassPathTemporarily(Path inputDirPath) {
         List<Path> sources = listModelFiles(inputDirPath);
         List<Path> targets = new ArrayList<>();
 
         try {
-            Path targetDir = Paths.get("models/org/openapitools/model");
-            FileUtils.deleteQuietly(targetDir.toFile());
-            FileUtils.forceMkdir(targetDir.toFile());
+            String sysTemp = System.getProperty("java.io.tmpdir");
+            Path currentDir = Paths.get(sysTemp).toAbsolutePath();
+            Path tempDir = Files.createTempDirectory(currentDir, "temp-pojo2jsonSchema-");
             sources.stream().forEach(source -> {
-                try {
 
-                    Path target = targetDir.resolve(source.getFileName());
+                try {
+                    Path target = tempDir.resolve(source.getFileName());
                     Files.copy(source, target, StandardCopyOption.REPLACE_EXISTING);
-                    targets.add(target);
+                    targets.add(target.toAbsolutePath());
                 } catch (IOException e) {
                     targets.clear();
                 }
@@ -76,9 +78,8 @@ public class Application {
                         .filter(p ->  {
                             System.out.println(p);
                             String modelPattern = p.getFileName().toString().toLowerCase();
-                            boolean isReq = modelPattern.endsWith("request.java");
-                            boolean isRes = modelPattern.endsWith("response.java");
-                            return (isReq || isRes);
+                            boolean isJava = modelPattern.endsWith(".java");
+                            return isJava;
                         })
                         .collect(Collectors.toList());
             }
@@ -94,8 +95,11 @@ public class Application {
             String key = entry.getKey();
             String val = entry.getValue();
             try {
-                String name = key+".json";
-                String outputFilename = outputDir.toString().concat(name);
+                String name = "" + key+".json";
+                Path schemaDir = outputDir.resolve("schemas");
+                FileUtils.forceMkdir(schemaDir.toFile());
+                String outputFilename = schemaDir.resolve(name).toAbsolutePath().toString();
+                System.out.println(String.format("Saving schema to '%s'", outputFilename));
                 Path file = Paths.get(outputFilename);
                 List<String> lines = Arrays.asList(val.split("\n"));
                 Files.write(file, lines, CREATE, WRITE, TRUNCATE_EXISTING);
