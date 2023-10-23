@@ -16,4 +16,11 @@ java -jar target/p2js.jar \
   --target ./models/org/openapitools/model
 ```
 You can find generated schemas (.json) in `models/org/openapitools/model/schemas/*.json
-`
+
+To generate samples from the schema:
+```bash
+nvm use 16
+npm i fs json-schema-faker
+node generate-sample-data.js ./models/org/openapitools/model/schemas/HandlersExamplePostExampleDataRequest.json 
+```
+
