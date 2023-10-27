@@ -20,7 +20,7 @@ You can find generated schemas (.json) in `models/org/openapitools/model/schemas
 To generate samples from the schema:
 ```bash
 nvm use 16
-npm i fs json-schema-faker
+npm i fs json-schema-faker @apidevtools/json-schema-ref-parser jsonpath
 node generate-sample-data.js ./models/org/openapitools/model/schemas/HandlersExamplePostExampleDataRequest.json 
 ```
 
