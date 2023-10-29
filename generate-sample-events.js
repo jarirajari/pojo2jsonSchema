@@ -1,5 +1,4 @@
 const fs = require('fs');
-const $RefParser = require('@apidevtools/json-schema-ref-parser');
 const jp = require('jsonpath');
 
 let events = [];

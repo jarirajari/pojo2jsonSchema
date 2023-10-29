@@ -21,6 +21,6 @@ To generate samples from the schema:
 ```bash
 nvm use 16
 npm i fs json-schema-faker @apidevtools/json-schema-ref-parser jsonpath
-node generate-sample-data.js ./models/org/openapitools/model/schemas/HandlersExamplePostExampleDataRequest.json 
+node generate-dereferenced-schema.js ./models/org/openapitools/model/schemas/HandlersExamplePostExampleDataRequest.json 
 ```
 
